@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
+/* 기본값을 다크 톤으로: 감지 실패/웹뷰에서도 안 망가짐 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0f1a;  /* slate 느낌 */
+  --foreground: #eef2ff;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -12,15 +14,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
+/* 라이트는 지원하되, 감지되는 환경에서만 적용 */
+@media (prefers-color-scheme: light) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #ffffff;
+    --foreground: #0b1220;
+    color-scheme: light;
   }
 }
 
+/* body에서 직접 칠하지 말고(충돌 방지), 토큰을 쓰게 두는 편이 안정적 */
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }

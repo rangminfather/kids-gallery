@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   title: "아이빛갤러리",
   description: "아이들 작품 사이버 전시관",
   manifest: "/manifest.json",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b0f1a" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -27,15 +31,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
+    <html lang="ko" className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-background text-foreground`}
       >
         {children}
       </body>
