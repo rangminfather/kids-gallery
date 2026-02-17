@@ -1,6 +1,6 @@
 {
   "name": "아이빛갤러리",
-  "short_name": "아이빛",
+  "short_name": "아이빛갤러리",
   "description": "아이들 작품 사이버 전시관",
   "start_url": "/",
   "display": "standalone",
