@@ -15,6 +15,12 @@ type Artwork = {
   public_until: string | null;
 };
 
+type ViewerArtwork = {
+  kid_name: string;
+  title: string;
+  public_until: string | null;
+};
+
 const PAGE_SIZE = 24;
 
 function formatKoreanDate(iso: string | null) {
@@ -28,8 +34,7 @@ function daysLeft(iso: string | null) {
   if (!iso) return null;
   const t = new Date(iso).getTime() - Date.now();
   if (Number.isNaN(t)) return null;
-  const d = Math.ceil(t / (24 * 60 * 60 * 1000));
-  return d;
+  return Math.ceil(t / (24 * 60 * 60 * 1000));
 }
 
 export default function GalleryPage() {
@@ -40,21 +45,20 @@ export default function GalleryPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  // ✅ (추가) 이미지 확대 모달 상태
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [viewerSrc, setViewerSrc] = useState<string>("");
-  const [viewerTitle, setViewerTitle] = useState<string>("");
+  const [viewerSrc, setViewerSrc] = useState("");
+  const [viewerArt, setViewerArt] = useState<ViewerArtwork | null>(null);
 
-  const openViewer = (src: string, title: string) => {
+  const openViewer = (art: ViewerArtwork, src: string) => {
     setViewerSrc(src);
-    setViewerTitle(title);
+    setViewerArt(art);
     setViewerOpen(true);
   };
 
   const closeViewer = () => {
     setViewerOpen(false);
     setViewerSrc("");
-    setViewerTitle("");
+    setViewerArt(null);
   };
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -64,7 +68,6 @@ export default function GalleryPage() {
     [currentPage, items]
   );
 
-  // ✅ (추가) ESC 닫기
   useEffect(() => {
     if (!viewerOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -77,7 +80,6 @@ export default function GalleryPage() {
   const load = async () => {
     setMsg("불러오는 중...");
 
-    // (선택) 만료 처리 RPC - 실패해도 갤러리 조회는 진행
     try {
       await supabase.rpc("expire_public_artworks");
     } catch {}
@@ -90,12 +92,13 @@ export default function GalleryPage() {
       .limit(200);
 
     if (error) {
-      setMsg("❌ 조회 실패: " + error.message);
+      setMsg("조회 실패: " + error.message);
       setItems([]);
       return;
     }
 
     setItems((data ?? []) as Artwork[]);
+    setPage(1);
     setMsg("");
   };
 
@@ -103,14 +106,12 @@ export default function GalleryPage() {
     let alive = true;
 
     const run = async () => {
-      // ✅ 1) 로그인 보호
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
         router.replace("/login");
         return;
       }
 
-      // ✅ 2) 로그인 상태면 로딩
       if (!alive) return;
       setLoading(true);
       await load();
@@ -120,7 +121,6 @@ export default function GalleryPage() {
 
     run();
 
-    // ✅ 3) 세션이 중간에 끊기면 즉시 로그인으로
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!session) router.replace("/login");
     });
@@ -149,13 +149,12 @@ export default function GalleryPage() {
         </div>
       </header>
 
-      {/* ✅ 로딩/메시지 */}
       {msg && <div className="notice">{msg}</div>}
       {loading && !msg && <div className="notice">불러오는 중...</div>}
 
       {!loading && items.length === 0 ? (
         <div className="empty">
-          <div className="emptyTitle">전시 중인 작품이 없어요</div>
+          <div className="emptyTitle">전시 중인 작품이 없어요.</div>
           <div className="emptyDesc">가족 전시관에서 전시 공개를 켜면 여기에서 보여요.</div>
         </div>
       ) : (
@@ -164,33 +163,31 @@ export default function GalleryPage() {
             {pagedItems.map((a) => {
               const left = daysLeft(a.public_until);
               const leftText = left == null ? "" : left <= 0 ? "오늘 종료" : `${left}일 남음`;
-
               const imgSrc = a.public_image_path || a.private_image_path;
 
               return (
                 <article className="card" key={a.id}>
-                  <div className="meta">
-                    <div className="kid">{a.kid_name}</div>
-                    <div className="until">
-                      종료: {formatKoreanDate(a.public_until)}
-                      {leftText ? <span className="pill">{leftText}</span> : null}
-                    </div>
-                  </div>
-
-                  <div className="title">{a.title}</div>
-
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className="img"
-                    src={imgSrc}
-                    alt={a.title}
-                    loading="lazy"
+                  <div
+                    className="thumbWrap"
                     role="button"
                     tabIndex={0}
-                    onClick={() => openViewer(imgSrc, a.title)}
-                    onKeyDown={(e) => e.key === "Enter" && openViewer(imgSrc, a.title)}
+                    onClick={() => openViewer({ kid_name: a.kid_name, title: a.title, public_until: a.public_until }, imgSrc)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && openViewer({ kid_name: a.kid_name, title: a.title, public_until: a.public_until }, imgSrc)
+                    }
                     title="클릭하면 크게 보기"
-                  />
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="img" src={imgSrc} alt={a.title} loading="lazy" />
+                    <div className="overlay">
+                      <div className="overlayTop">
+                        <div className="kid">{a.kid_name}</div>
+                        {leftText ? <span className="pill">{leftText}</span> : null}
+                      </div>
+                      <div className="title">{a.title}</div>
+                      <div className="overlayMeta">종료 {formatKoreanDate(a.public_until)}</div>
+                    </div>
+                  </div>
                 </article>
               );
             })}
@@ -206,262 +203,79 @@ export default function GalleryPage() {
           <div className="pagerText">
             {currentPage} / {totalPages}
           </div>
-          <button
-            className="ghost"
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-          >
+          <button className="ghost" onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>
             다음
           </button>
         </div>
       )}
 
-      {/* ✅ (추가) 확대 모달 */}
-      {viewerOpen && (
+      {viewerOpen && viewerArt && (
         <div className="modal" onClick={closeViewer} role="dialog" aria-modal="true">
           <div className="modalCard" onClick={(e) => e.stopPropagation()}>
             <div className="modalTop">
-              <div className="modalTitle">{viewerTitle}</div>
+              <div className="modalTitleWrap">
+                <div className="modalEyebrow">{viewerArt.kid_name}</div>
+                <div className="modalTitle">{viewerArt.title}</div>
+              </div>
               <button className="modalClose" onClick={closeViewer} aria-label="닫기">
                 닫기
               </button>
             </div>
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="modalImg" src={viewerSrc} alt={viewerTitle} />
+            <img className="modalImg" src={viewerSrc} alt={viewerArt.title} />
+
+            <div className="modalInfo">
+              <div className="infoRow">
+                <span className="infoKey">공개 종료</span>
+                <span className="infoVal">{formatKoreanDate(viewerArt.public_until)}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       <style jsx>{`
-        .wrap {
-          padding: 38px;
-          max-width: 1040px;
-          margin: 0 auto;
-        }
-
-        .header {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 14px;
-          padding-bottom: 14px;
-          border-bottom: 1px solid #eef0f3;
-        }
-
-        .eyebrow {
-          font-size: 11px;
-          letter-spacing: 0.18em;
-          color: #6b7280;
-        }
-
-        .h1 {
-          margin: 6px 0 6px;
-          letter-spacing: -0.6px;
-          font-size: 28px;
-        }
-
-        .desc {
-          margin: 0;
-          color: #6b7280;
-          font-size: 14px;
-          line-height: 1.45;
-        }
-
-        .right {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-        }
-
-        .ghost {
-          font-size: 12px;
-          padding: 8px 10px;
-          border-radius: 12px;
-          border: 1px solid #e5e7eb;
-          background: #fff;
-          color: #111827;
-          text-decoration: none;
-          font-weight: 700;
-        }
-
-        .notice {
-          margin-top: 14px;
-          padding: 10px 12px;
-          border: 1px solid #eee;
-          border-radius: 12px;
-          background: #fff;
-          color: #111827;
-          font-size: 13px;
-        }
-
-        .empty {
-          margin-top: 18px;
-          border: 1px solid #eef0f3;
-          border-radius: 16px;
-          padding: 18px;
-          background: #fafafa;
-        }
-
-        .emptyTitle {
-          font-weight: 900;
-          letter-spacing: -0.4px;
-        }
-
-        .emptyDesc {
-          margin-top: 6px;
-          font-size: 13px;
-          color: #6b7280;
-          line-height: 1.45;
-        }
-
-        .grid {
-          margin-top: 16px;
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-          gap: 12px;
-        }
-
-        .pager {
-          margin-top: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-        }
-
-        .pagerText {
-          min-width: 72px;
-          text-align: center;
-          font-size: 12px;
-          color: #6b7280;
-          font-weight: 900;
-        }
-
-        .card {
-          border: 1px solid #e8ebf0;
-          border-radius: 16px;
-          background: #fff;
-          padding: 12px;
-          box-shadow: 0 1px 0 rgba(17, 24, 39, 0.04);
-        }
-
-        .meta {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
-        .kid {
-          font-size: 12px;
-          color: #6b7280;
-          font-weight: 700;
-        }
-
-        .until {
-          font-size: 12px;
-          color: #6b7280;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          white-space: nowrap;
-        }
-
-        .pill {
-          font-size: 11px;
-          padding: 3px 8px;
-          border-radius: 999px;
-          background: #f3f4f6;
-          border: 1px solid #e5e7eb;
-          color: #111827;
-          font-weight: 800;
-        }
-
-        .title {
-          margin-top: 6px;
-          margin-bottom: 10px;
-          font-weight: 900;
-          letter-spacing: -0.3px;
-          word-break: break-word;
-          line-height: 1.25;
-        }
-
-        .img {
-          width: 100%;
-          height: 210px;
-          object-fit: cover;
-          border-radius: 14px;
-          background: #f3f4f6;
-          border: 1px solid #f1f5f9;
-          cursor: zoom-in;
-        }
-
-        /* ✅ 모달 */
-        .modal {
-          position: fixed;
-          inset: 0;
-          background: rgba(17, 24, 39, 0.6);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 18px;
-          z-index: 1000;
-        }
-
-        .modalCard {
-          width: min(980px, 100%);
-          max-height: 92vh;
-          background: #fff;
-          border-radius: 16px;
-          border: 1px solid rgba(0, 0, 0, 0.08);
-          overflow: hidden;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-        }
-
-        .modalTop {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          align-items: center;
-          padding: 12px 14px;
-          border-bottom: 1px solid #eef0f3;
-        }
-
-        .modalTitle {
-          font-weight: 900;
-          letter-spacing: -0.3px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .modalClose {
-          padding: 8px 10px;
-          border-radius: 12px;
-          border: 1px solid #e5e7eb;
-          background: #fff;
-          color: #111827;
-          font-size: 12px;
-          font-weight: 900;
-          cursor: pointer;
-        }
-
-        .modalImg {
-          width: 100%;
-          height: auto;
-          max-height: calc(92vh - 52px);
-          object-fit: contain;
-          background: #111827;
-        }
+        .wrap { padding: 38px; max-width: 1280px; margin: 0 auto; }
+        .header { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid #eef0f3; }
+        .eyebrow { font-size: 11px; letter-spacing: 0.18em; color: #6b7280; }
+        .h1 { margin: 6px 0 6px; letter-spacing: -0.6px; font-size: 28px; }
+        .desc { margin: 0; color: #6b7280; font-size: 14px; line-height: 1.45; }
+        .right { display: flex; gap: 10px; align-items: center; }
+        .ghost { font-size: 12px; padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; text-decoration: none; font-weight: 700; }
+        .notice { margin-top: 14px; padding: 10px 12px; border: 1px solid #eee; border-radius: 12px; background: #fff; color: #111827; font-size: 13px; }
+        .empty { margin-top: 18px; border: 1px solid #eef0f3; border-radius: 16px; padding: 18px; background: #fafafa; }
+        .emptyTitle { font-weight: 900; letter-spacing: -0.4px; }
+        .emptyDesc { margin-top: 6px; font-size: 13px; color: #6b7280; line-height: 1.45; }
+        .grid { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+        .card { border: 1px solid #e8ebf0; border-radius: 18px; background: #fff; padding: 10px; box-shadow: 0 10px 24px rgba(17, 24, 39, 0.06); }
+        .thumbWrap { position: relative; cursor: zoom-in; border-radius: 14px; overflow: hidden; }
+        .overlay { position: absolute; inset: auto 0 0 0; padding: 10px; background: linear-gradient(180deg, rgba(17,24,39,0.04) 0%, rgba(17,24,39,0.74) 62%, rgba(17,24,39,0.92) 100%); color: #fff; }
+        .overlayTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+        .kid { font-size: 12px; color: rgba(255,255,255,0.82); font-weight: 700; }
+        .pill { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.88); border: 1px solid rgba(255,255,255,0.4); color: #111827; font-weight: 800; }
+        .title { font-weight: 900; letter-spacing: -0.3px; word-break: break-word; line-height: 1.25; }
+        .overlayMeta { margin-top: 6px; font-size: 11px; color: rgba(255,255,255,0.78); font-weight: 700; }
+        .img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: #f3f4f6; border: 1px solid #f1f5f9; }
+        .pager { margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .pagerText { min-width: 72px; text-align: center; font-size: 12px; color: #6b7280; font-weight: 900; }
+        .modal { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.6); display: flex; align-items: center; justify-content: center; padding: 18px; z-index: 1000; }
+        .modalCard { width: min(1080px, 100%); max-height: 92vh; background: #fff; border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.08); overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); }
+        .modalTop { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid #eef0f3; }
+        .modalTitleWrap { min-width: 0; }
+        .modalEyebrow { font-size: 11px; color: #6b7280; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+        .modalTitle { font-weight: 900; letter-spacing: -0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .modalClose { padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
+        .modalImg { width: 100%; height: auto; max-height: calc(92vh - 146px); object-fit: contain; background: #111827; }
+        .modalInfo { padding: 14px; border-top: 1px solid #eef0f3; background: #fff; }
+        .infoRow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+        .infoKey { font-size: 12px; color: #6b7280; font-weight: 800; }
+        .infoVal { font-size: 13px; color: #111827; font-weight: 900; text-align: right; }
 
         @media (max-width: 720px) {
-          .wrap {
-            padding: 18px;
-          }
-          .header {
-            align-items: flex-start;
-          }
+          .wrap { padding: 18px; }
+          .header { align-items: flex-start; }
+          .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
         }
       `}</style>
     </main>

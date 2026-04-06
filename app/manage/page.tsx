@@ -199,10 +199,12 @@ export default function ManagePage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerSrc, setViewerSrc] = useState<string>("");
   const [viewerTitle, setViewerTitle] = useState<string>("");
+  const [viewerArt, setViewerArt] = useState<Artwork | null>(null);
 
-  const openViewer = (src: string, title: string) => {
-    setViewerSrc(src);
-    setViewerTitle(title);
+  const openViewer = (art: Artwork) => {
+    setViewerSrc(art.private_image_path);
+    setViewerTitle(art.title);
+    setViewerArt(art);
     setViewerOpen(true);
   };
 
@@ -210,6 +212,7 @@ export default function ManagePage() {
     setViewerOpen(false);
     setViewerSrc("");
     setViewerTitle("");
+    setViewerArt(null);
   };
 
   // ✅ ESC 닫기
@@ -579,35 +582,23 @@ export default function ManagePage() {
 
             return (
               <article className="card" key={a.id}>
-                <div className="top">
-                  <div className="left">
-                    <div className="kid">{a.kid_name}</div>
-                    <div className="title">{a.title}</div>
-                  </div>
-                  <StatusBadge art={a} />
-                </div>
-
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  className="img"
-                  src={a.private_image_path}
-                  alt={a.title}
-                  loading="lazy"
+                <div
+                  className="thumbWrap"
                   role="button"
                   tabIndex={0}
-                  onClick={() => openViewer(a.private_image_path, a.title)}
-                  onKeyDown={(e) => e.key === "Enter" && openViewer(a.private_image_path, a.title)}
+                  onClick={() => openViewer(a)}
+                  onKeyDown={(e) => e.key === "Enter" && openViewer(a)}
                   title="클릭하면 크게 보기"
-                />
-
-                <div className="metaRow">
-                  <div className="metaLine">
-                    <span className="metaKey">작품제작일</span>
-                    <span className="metaVal">{formatKoreanDate(a.artwork_made_at)}</span>
-                  </div>
-                  <div className="metaLine">
-                    <span className="metaKey">전시만료</span>
-                    <span className="metaVal">{formatKoreanDate(a.public_until)}</span>
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="img" src={a.private_image_path} alt={a.title} loading="lazy" />
+                  <div className="overlay">
+                    <div className="overlayTop">
+                      <div className="kid">{a.kid_name}</div>
+                      <StatusBadge art={a} />
+                    </div>
+                    <div className="title">{a.title}</div>
+                    <div className="overlayMeta">작품제작일 {formatKoreanDate(a.artwork_made_at)}</div>
                   </div>
                 </div>
 
@@ -662,7 +653,10 @@ export default function ManagePage() {
         <div className="modal" onClick={closeViewer} role="dialog" aria-modal="true">
           <div className="modalCard" onClick={(e) => e.stopPropagation()}>
             <div className="modalTop">
-              <div className="modalTitle">{viewerTitle}</div>
+              <div className="modalTitleWrap">
+                <div className="modalEyebrow">{viewerArt?.kid_name ?? ""}</div>
+                <div className="modalTitle">{viewerTitle}</div>
+              </div>
               <button className="modalClose" onClick={closeViewer} aria-label="닫기">
                 닫기
               </button>
@@ -670,12 +664,24 @@ export default function ManagePage() {
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="modalImg" src={viewerSrc} alt={viewerTitle} />
+            {viewerArt && (
+              <div className="modalInfo">
+                <div className="infoRow">
+                  <span className="infoKey">작품제작일</span>
+                  <span className="infoVal">{formatKoreanDate(viewerArt.artwork_made_at)}</span>
+                </div>
+                <div className="infoRow">
+                  <span className="infoKey">전시만료</span>
+                  <span className="infoVal">{formatKoreanDate(viewerArt.public_until)}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       <style jsx>{`
-        .wrap { padding: 38px; max-width: 1040px; margin: 0 auto; }
+        .wrap { padding: 38px; max-width: 1280px; margin: 0 auto; }
         .header { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid #eef0f3; }
         .eyebrow { font-size: 11px; letter-spacing: 0.18em; color: #6b7280; }
         .h1 { margin: 6px 0 6px; letter-spacing: -0.6px; font-size: 28px; }
@@ -721,17 +727,16 @@ export default function ManagePage() {
         .emptyTitle { font-weight: 900; letter-spacing: -0.4px; }
         .emptyDesc { margin-top: 6px; font-size: 13px; color: #6b7280; line-height: 1.45; }
 
-        .grid { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-        .card { border: 1px solid #e8ebf0; border-radius: 16px; background: #fff; padding: 12px; box-shadow: 0 1px 0 rgba(17, 24, 39, 0.04); }
-        .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+        .grid { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+        .card { border: 1px solid #e8ebf0; border-radius: 18px; background: #fff; padding: 10px; box-shadow: 0 10px 24px rgba(17, 24, 39, 0.06); }
+        .thumbWrap { position: relative; cursor: zoom-in; border-radius: 14px; overflow: hidden; }
+        .overlay { position: absolute; inset: auto 0 0 0; padding: 10px; background: linear-gradient(180deg, rgba(17,24,39,0.04) 0%, rgba(17,24,39,0.74) 62%, rgba(17,24,39,0.92) 100%); color: #fff; }
+        .overlayTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
         .kid { font-size: 12px; color: #6b7280; font-weight: 800; }
-        .title { margin-top: 3px; font-weight: 900; letter-spacing: -0.3px; word-break: break-word; line-height: 1.25; }
-        .img { margin-top: 10px; width: 100%; height: 210px; object-fit: cover; border-radius: 14px; background: #f3f4f6; border: 1px solid #f1f5f9; cursor: zoom-in; }
-
-        .metaRow { margin-top: 10px; display: grid; gap: 6px; }
-        .metaLine { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-        .metaKey { font-size: 12px; color: #6b7280; font-weight: 800; }
-        .metaVal { font-size: 12px; color: #111827; font-weight: 800; }
+        .overlay .kid { color: rgba(255,255,255,0.82); }
+        .title { font-weight: 900; letter-spacing: -0.3px; word-break: break-word; line-height: 1.25; }
+        .overlayMeta { margin-top: 6px; font-size: 11px; color: rgba(255,255,255,0.78); font-weight: 700; }
+        .img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: #f3f4f6; border: 1px solid #f1f5f9; }
 
         .actions { margin-top: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .toggleBtn { padding: 10px 12px; border-radius: 12px; font-size: 12px; font-weight: 900; letter-spacing: -0.2px; cursor: pointer; }
@@ -748,14 +753,21 @@ export default function ManagePage() {
         .modal { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.6); display: flex; align-items: center; justify-content: center; padding: 18px; z-index: 1000; }
         .modalCard { width: min(980px, 100%); max-height: 92vh; background: #fff; border-radius: 16px; border: 1px solid rgba(0,0,0,0.08); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.18); }
         .modalTop { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid #eef0f3; }
+        .modalTitleWrap { min-width: 0; }
+        .modalEyebrow { font-size: 11px; color: #6b7280; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
         .modalTitle { font-weight: 900; letter-spacing: -0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .modalClose { padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
-        .modalImg { width: 100%; height: auto; max-height: calc(92vh - 52px); object-fit: contain; background: #111827; }
+        .modalImg { width: 100%; height: auto; max-height: calc(92vh - 190px); object-fit: contain; background: #111827; }
+        .modalInfo { display: grid; gap: 8px; padding: 14px; border-top: 1px solid #eef0f3; background: #fff; }
+        .infoRow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+        .infoKey { font-size: 12px; color: #6b7280; font-weight: 800; }
+        .infoVal { font-size: 13px; color: #111827; font-weight: 900; text-align: right; }
 
         @media (max-width: 720px) {
           .wrap { padding: 18px; }
           .header { align-items: flex-start; }
           .spacer { display: none; }
+          .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
         }
       `}</style>
     </main>
