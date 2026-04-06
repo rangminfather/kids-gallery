@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,10 +16,6 @@ export const metadata: Metadata = {
   title: "아이빛갤러리",
   description: "아이들 작품 사이버 전시관",
   manifest: "/manifest.json",
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0b0f1a" },
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-  ],
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -29,6 +25,13 @@ export const metadata: Metadata = {
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
     ]
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b0f1a" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
