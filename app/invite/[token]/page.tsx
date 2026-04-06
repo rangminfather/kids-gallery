@@ -31,6 +31,8 @@ type ArtworkView = {
   artwork_made_at: string | null;
 };
 
+const PAGE_SIZE = 24;
+
 function fmt(iso: string | null | undefined) {
   if (!iso) return "-";
   const d = new Date(iso);
@@ -73,6 +75,7 @@ export default function InvitePage() {
 
   const [loading, setLoading] = useState(true);
   const [submitBusy, setSubmitBusy] = useState(false);
+  const [page, setPage] = useState(1);
 
   // ✅ (추가) 이미지 확대 모달 상태
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -91,6 +94,13 @@ export default function InvitePage() {
     setViewerTitle("");
   };
 
+  const totalPages = Math.max(1, Math.ceil(artworks.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedArtworks = useMemo(
+    () => artworks.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [artworks, currentPage]
+  );
+
   // ✅ (추가) ESC로 닫기
   useEffect(() => {
     if (!viewerOpen) return;
@@ -99,7 +109,6 @@ export default function InvitePage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerOpen]);
 
   // ✅ RPC 호출 결과를 "개수"까지 반환해서, state 타이밍 이슈 제거
@@ -260,7 +269,7 @@ export default function InvitePage() {
           </div>
         ) : (
           <div className="grid">
-            {artworks.map((a) => (
+            {pagedArtworks.map((a) => (
               <article className="card" key={a.id}>
                 <div className="meta">
                   <div className="kid">{a.kid_name}</div>
@@ -289,6 +298,24 @@ export default function InvitePage() {
           </div>
         )}
       </section>
+
+      {artworks.length > PAGE_SIZE && (
+        <div className="pager">
+          <button className="pageBtn" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={currentPage === 1}>
+            이전
+          </button>
+          <div className="pagerText">
+            {currentPage} / {totalPages}
+          </div>
+          <button
+            className="pageBtn"
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+          >
+            다음
+          </button>
+        </div>
+      )}
 
       {/* ✅ (추가) 확대 모달 */}
       {viewerOpen && (
@@ -394,6 +421,9 @@ export default function InvitePage() {
         .made { font-size: 12px; color: #6b7280; font-weight: 800; white-space: nowrap; }
         .title { margin-top: 6px; margin-bottom: 10px; font-weight: 900; letter-spacing: -0.3px; word-break: break-word; line-height: 1.25; }
         .img { width: 100%; height: 210px; object-fit: cover; border-radius: 14px; background: #f3f4f6; border: 1px solid #f1f5f9; cursor: zoom-in; }
+        .pager { margin-top: -4px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .pageBtn { padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
+        .pagerText { min-width: 72px; text-align: center; font-size: 12px; color: #6b7280; font-weight: 900; }
 
         /* ✅ 모달 */
         .modal {

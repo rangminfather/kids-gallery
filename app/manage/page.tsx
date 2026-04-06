@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
@@ -24,9 +25,16 @@ type Entry = {
 };
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+const PAGE_SIZE = 24;
 
 function toISO(d: Date) {
   return d.toISOString();
+}
+
+function twoWeeksFromNowISO() {
+  const d = new Date();
+  d.setTime(d.getTime() + TWO_WEEKS_MS);
+  return toISO(d);
 }
 
 function formatKoreanDate(iso: string | null) {
@@ -181,6 +189,7 @@ export default function ManagePage() {
   const [inviteBusy, setInviteBusy] = useState(false);
 
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
 
   /** ✅ 방명록 상태 */
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -211,7 +220,6 @@ export default function ManagePage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerOpen]);
 
   const inviteLink = useMemo(() => {
@@ -225,6 +233,13 @@ export default function ManagePage() {
     if (!t) return items;
     return items.filter((a) => a.kid_name.toLowerCase().includes(t) || a.title.toLowerCase().includes(t));
   }, [items, q]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedItems = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, filtered]
+  );
 
   const load = async (familyId: string) => {
     setMsg("불러오는 중...");
@@ -242,6 +257,7 @@ export default function ManagePage() {
     }
 
     setItems((data ?? []) as Artwork[]);
+    setPage(1);
     setMsg("");
   };
 
@@ -361,7 +377,7 @@ export default function ManagePage() {
 
     const payload: { is_public: boolean; public_until: string | null } = {
       is_public: next,
-      public_until: next ? toISO(new Date(Date.now() + TWO_WEEKS_MS)) : null,
+      public_until: next ? twoWeeksFromNowISO() : null,
     };
 
     const { error } = await supabase.from("artworks").update(payload).eq("id", art.id);
@@ -383,7 +399,7 @@ export default function ManagePage() {
 
     const payload = {
       is_public: true,
-      public_until: toISO(new Date(Date.now() + TWO_WEEKS_MS)),
+      public_until: twoWeeksFromNowISO(),
     };
 
     const { error } = await supabase.from("artworks").update(payload).eq("id", art.id);
@@ -439,12 +455,12 @@ export default function ManagePage() {
         </div>
 
         <div className="right">
-          <a className="ghost" href="/">
+          <Link className="ghost" href="/">
             메인
-          </a>
-          <a className="primary" href="/upload">
+          </Link>
+          <Link className="primary" href="/upload">
             업로드
-          </a>
+          </Link>
         </div>
       </header>
 
@@ -522,12 +538,21 @@ export default function ManagePage() {
       </section>
 
       <div className="toolbar">
-        <input
-          className="search"
-          placeholder="검색 (아이 이름 / 제목)"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+        <div className="searchWrap">
+          <input
+            className="search"
+            placeholder="검색 (아이 이름 / 제목)"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+          />
+          <div className="resultMeta">
+            전체 {filtered.length}개
+            {filtered.length > PAGE_SIZE ? ` · ${currentPage}/${totalPages} 페이지` : ""}
+          </div>
+        </div>
         <button className="ghostBtn" onClick={() => myFamilyId && load(myFamilyId)} disabled={!myFamilyId}>
           새로고침
         </button>
@@ -542,7 +567,7 @@ export default function ManagePage() {
         </div>
       ) : (
         <section className="grid">
-          {filtered.map((a) => {
+          {pagedItems.map((a) => {
             const busy = busyId === a.id;
             const expired = isExpired(a);
             const extendEnabled = a.is_public && expired;
@@ -614,6 +639,24 @@ export default function ManagePage() {
         </section>
       )}
 
+      {filtered.length > PAGE_SIZE && (
+        <div className="pager">
+          <button className="ghostBtn" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={currentPage === 1}>
+            이전
+          </button>
+          <div className="pagerText">
+            {currentPage} / {totalPages}
+          </div>
+          <button
+            className="ghostBtn"
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+          >
+            다음
+          </button>
+        </div>
+      )}
+
       {/* ✅ 이미지 확대 모달 */}
       {viewerOpen && (
         <div className="modal" onClick={closeViewer} role="dialog" aria-modal="true">
@@ -668,8 +711,10 @@ export default function ManagePage() {
         .guestWhen { font-size: 12px; color: #6b7280; font-weight: 800; white-space: nowrap; }
         .guestContent { margin-top: 6px; line-height: 1.55; }
 
-        .toolbar { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
+        .toolbar { margin-top: 14px; display: flex; gap: 10px; align-items: flex-end; }
+        .searchWrap { flex: 1; display: grid; gap: 6px; }
         .search { flex: 1; padding: 11px 12px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; outline: none; font-size: 13px; }
+        .resultMeta { font-size: 12px; color: #6b7280; font-weight: 800; }
         .notice { margin-top: 14px; padding: 10px 12px; border: 1px solid #eee; border-radius: 12px; background: #fff; color: #111827; font-size: 13px; }
 
         .empty { margin-top: 18px; border: 1px solid #eef0f3; border-radius: 16px; padding: 18px; background: #fafafa; }
@@ -696,6 +741,8 @@ export default function ManagePage() {
         .spacer { flex: 1; }
         .delBtn { padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; font-size: 12px; font-weight: 900; letter-spacing: -0.2px; }
         .busy { margin-top: 10px; font-size: 12px; color: #6b7280; }
+        .pager { margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .pagerText { min-width: 72px; text-align: center; font-size: 12px; color: #6b7280; font-weight: 900; }
 
         /* ✅ 모달 */
         .modal { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.6); display: flex; align-items: center; justify-content: center; padding: 18px; z-index: 1000; }

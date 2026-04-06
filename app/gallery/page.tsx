@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -13,6 +14,8 @@ type Artwork = {
   created_at: string;
   public_until: string | null;
 };
+
+const PAGE_SIZE = 24;
 
 function formatKoreanDate(iso: string | null) {
   if (!iso) return "-";
@@ -35,6 +38,7 @@ export default function GalleryPage() {
   const [items, setItems] = useState<Artwork[]>([]);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   // ✅ (추가) 이미지 확대 모달 상태
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -53,6 +57,13 @@ export default function GalleryPage() {
     setViewerTitle("");
   };
 
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedItems = useMemo(
+    () => items.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, items]
+  );
+
   // ✅ (추가) ESC 닫기
   useEffect(() => {
     if (!viewerOpen) return;
@@ -61,7 +72,6 @@ export default function GalleryPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerOpen]);
 
   const load = async () => {
@@ -119,7 +129,6 @@ export default function GalleryPage() {
       alive = false;
       sub.subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   return (
@@ -134,9 +143,9 @@ export default function GalleryPage() {
         </div>
 
         <div className="right">
-          <a className="ghost" href="/">
+          <Link className="ghost" href="/">
             메인으로
-          </a>
+          </Link>
         </div>
       </header>
 
@@ -152,7 +161,7 @@ export default function GalleryPage() {
       ) : (
         !loading && (
           <section className="grid">
-            {items.map((a) => {
+            {pagedItems.map((a) => {
               const left = daysLeft(a.public_until);
               const leftText = left == null ? "" : left <= 0 ? "오늘 종료" : `${left}일 남음`;
 
@@ -187,6 +196,24 @@ export default function GalleryPage() {
             })}
           </section>
         )
+      )}
+
+      {!loading && items.length > PAGE_SIZE && (
+        <div className="pager">
+          <button className="ghost" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={currentPage === 1}>
+            이전
+          </button>
+          <div className="pagerText">
+            {currentPage} / {totalPages}
+          </div>
+          <button
+            className="ghost"
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+          >
+            다음
+          </button>
+        </div>
       )}
 
       {/* ✅ (추가) 확대 모달 */}
@@ -293,6 +320,22 @@ export default function GalleryPage() {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
           gap: 12px;
+        }
+
+        .pager {
+          margin-top: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+        }
+
+        .pagerText {
+          min-width: 72px;
+          text-align: center;
+          font-size: 12px;
+          color: #6b7280;
+          font-weight: 900;
         }
 
         .card {
