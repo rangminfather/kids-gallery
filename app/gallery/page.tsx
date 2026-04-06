@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
@@ -48,10 +48,12 @@ export default function GalleryPage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerSrc, setViewerSrc] = useState("");
   const [viewerArt, setViewerArt] = useState<ViewerArtwork | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
-  const openViewer = (art: ViewerArtwork, src: string) => {
+  const openViewer = (art: ViewerArtwork, src: string, index: number) => {
     setViewerSrc(src);
     setViewerArt(art);
+    setViewerIndex(index);
     setViewerOpen(true);
   };
 
@@ -59,7 +61,30 @@ export default function GalleryPage() {
     setViewerOpen(false);
     setViewerSrc("");
     setViewerArt(null);
+    setViewerIndex(null);
   };
+
+  const canMovePrev = viewerIndex != null && viewerIndex > 0;
+  const canMoveNext = viewerIndex != null && viewerIndex < items.length - 1;
+
+  const moveViewer = (direction: -1 | 1) => {
+    if (viewerIndex == null) return;
+    const nextIndex = viewerIndex + direction;
+    if (nextIndex < 0 || nextIndex >= items.length) return;
+    const nextArt = items[nextIndex];
+    const nextSrc = nextArt.public_image_path || nextArt.private_image_path;
+    setViewerIndex(nextIndex);
+    setViewerSrc(nextSrc);
+    setViewerArt({
+      kid_name: nextArt.kid_name,
+      title: nextArt.title,
+      public_until: nextArt.public_until,
+    });
+  };
+
+  const moveViewerEvent = useEffectEvent((direction: -1 | 1) => {
+    moveViewer(direction);
+  });
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -72,6 +97,8 @@ export default function GalleryPage() {
     if (!viewerOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeViewer();
+      if (e.key === "ArrowLeft") moveViewerEvent(-1);
+      if (e.key === "ArrowRight") moveViewerEvent(1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -164,6 +191,7 @@ export default function GalleryPage() {
               const left = daysLeft(a.public_until);
               const leftText = left == null ? "" : left <= 0 ? "오늘 종료" : `${left}일 남음`;
               const imgSrc = a.public_image_path || a.private_image_path;
+              const absoluteIndex = items.findIndex((item) => item.id === a.id);
 
               return (
                 <article className="card" key={a.id}>
@@ -171,9 +199,9 @@ export default function GalleryPage() {
                     className="thumbWrap"
                     role="button"
                     tabIndex={0}
-                    onClick={() => openViewer({ kid_name: a.kid_name, title: a.title, public_until: a.public_until }, imgSrc)}
+                    onClick={() => openViewer({ kid_name: a.kid_name, title: a.title, public_until: a.public_until }, imgSrc, absoluteIndex)}
                     onKeyDown={(e) =>
-                      e.key === "Enter" && openViewer({ kid_name: a.kid_name, title: a.title, public_until: a.public_until }, imgSrc)
+                      e.key === "Enter" && openViewer({ kid_name: a.kid_name, title: a.title, public_until: a.public_until }, imgSrc, absoluteIndex)
                     }
                     title="클릭하면 크게 보기"
                   >
@@ -217,9 +245,17 @@ export default function GalleryPage() {
                 <div className="modalEyebrow">{viewerArt.kid_name}</div>
                 <div className="modalTitle">{viewerArt.title}</div>
               </div>
-              <button className="modalClose" onClick={closeViewer} aria-label="닫기">
-                닫기
-              </button>
+              <div className="modalActions">
+                <button className="navBtn" onClick={() => moveViewer(-1)} disabled={!canMovePrev} aria-label="이전 작품">
+                  이전
+                </button>
+                <button className="navBtn" onClick={() => moveViewer(1)} disabled={!canMoveNext} aria-label="다음 작품">
+                  다음
+                </button>
+                <button className="modalClose" onClick={closeViewer} aria-label="닫기">
+                  닫기
+                </button>
+              </div>
             </div>
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -265,6 +301,9 @@ export default function GalleryPage() {
         .modalTitleWrap { min-width: 0; }
         .modalEyebrow { font-size: 11px; color: #6b7280; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
         .modalTitle { font-weight: 900; letter-spacing: -0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .modalActions { display: flex; align-items: center; gap: 8px; }
+        .navBtn { padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
+        .navBtn:disabled { opacity: 0.45; cursor: not-allowed; }
         .modalClose { padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
         .modalImg { width: 100%; height: auto; max-height: calc(92vh - 146px); object-fit: contain; background: #111827; }
         .modalInfo { padding: 14px; border-top: 1px solid #eef0f3; background: #fff; }

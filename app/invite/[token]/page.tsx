@@ -76,10 +76,12 @@ export default function InvitePage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerSrc, setViewerSrc] = useState("");
   const [viewerArt, setViewerArt] = useState<ArtworkView | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
-  const openViewer = (art: ArtworkView) => {
+  const openViewer = (art: ArtworkView, index: number) => {
     setViewerSrc(art.image_url);
     setViewerArt(art);
+    setViewerIndex(index);
     setViewerOpen(true);
   };
 
@@ -87,7 +89,25 @@ export default function InvitePage() {
     setViewerOpen(false);
     setViewerSrc("");
     setViewerArt(null);
+    setViewerIndex(null);
   };
+
+  const canMovePrev = viewerIndex != null && viewerIndex > 0;
+  const canMoveNext = viewerIndex != null && viewerIndex < artworks.length - 1;
+
+  const moveViewer = (direction: -1 | 1) => {
+    if (viewerIndex == null) return;
+    const nextIndex = viewerIndex + direction;
+    if (nextIndex < 0 || nextIndex >= artworks.length) return;
+    const nextArt = artworks[nextIndex];
+    setViewerIndex(nextIndex);
+    setViewerSrc(nextArt.image_url);
+    setViewerArt(nextArt);
+  };
+
+  const moveViewerEvent = useEffectEvent((direction: -1 | 1) => {
+    moveViewer(direction);
+  });
 
   const totalPages = Math.max(1, Math.ceil(artworks.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -100,6 +120,8 @@ export default function InvitePage() {
     if (!viewerOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeViewer();
+      if (e.key === "ArrowLeft") moveViewerEvent(-1);
+      if (e.key === "ArrowRight") moveViewerEvent(1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -250,12 +272,15 @@ export default function InvitePage() {
           <div className="grid">
             {pagedArtworks.map((a) => (
               <article className="card" key={a.id}>
+                {(() => {
+                  const absoluteIndex = artworks.findIndex((item) => item.id === a.id);
+                  return (
                 <div
                   className="thumbWrap"
                   role="button"
                   tabIndex={0}
-                  onClick={() => openViewer(a)}
-                  onKeyDown={(e) => e.key === "Enter" && openViewer(a)}
+                  onClick={() => openViewer(a, absoluteIndex)}
+                  onKeyDown={(e) => e.key === "Enter" && openViewer(a, absoluteIndex)}
                   title="클릭하면 크게 보기"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -276,6 +301,8 @@ export default function InvitePage() {
                     <div className="overlayMeta">작품제작일 {fmt(a.artwork_made_at ?? a.created_at)}</div>
                   </div>
                 </div>
+                  );
+                })()}
               </article>
             ))}
           </div>
@@ -304,9 +331,17 @@ export default function InvitePage() {
                 <div className="modalEyebrow">{viewerArt.kid_name}</div>
                 <div className="modalTitle">{viewerArt.title}</div>
               </div>
-              <button className="modalClose" onClick={closeViewer} aria-label="닫기">
-                닫기
-              </button>
+              <div className="modalActions">
+                <button className="navBtn" onClick={() => moveViewer(-1)} disabled={!canMovePrev} aria-label="이전 작품">
+                  이전
+                </button>
+                <button className="navBtn" onClick={() => moveViewer(1)} disabled={!canMoveNext} aria-label="다음 작품">
+                  다음
+                </button>
+                <button className="modalClose" onClick={closeViewer} aria-label="닫기">
+                  닫기
+                </button>
+              </div>
             </div>
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -407,6 +442,9 @@ export default function InvitePage() {
         .modalTitleWrap { min-width: 0; }
         .modalEyebrow { font-size: 11px; color: #6b7280; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
         .modalTitle { font-weight: 900; letter-spacing: -0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .modalActions { display: flex; align-items: center; gap: 8px; }
+        .navBtn { padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
+        .navBtn:disabled { opacity: 0.45; cursor: not-allowed; }
         .modalClose { padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
         .modalImg { width: 100%; height: auto; max-height: calc(92vh - 146px); object-fit: contain; background: #111827; }
         .modalInfo { padding: 14px; border-top: 1px solid #eef0f3; background: #fff; }

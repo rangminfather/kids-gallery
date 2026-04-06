@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
@@ -200,11 +200,13 @@ export default function ManagePage() {
   const [viewerSrc, setViewerSrc] = useState<string>("");
   const [viewerTitle, setViewerTitle] = useState<string>("");
   const [viewerArt, setViewerArt] = useState<Artwork | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
-  const openViewer = (art: Artwork) => {
+  const openViewer = (art: Artwork, index: number) => {
     setViewerSrc(art.private_image_path);
     setViewerTitle(art.title);
     setViewerArt(art);
+    setViewerIndex(index);
     setViewerOpen(true);
   };
 
@@ -213,13 +215,34 @@ export default function ManagePage() {
     setViewerSrc("");
     setViewerTitle("");
     setViewerArt(null);
+    setViewerIndex(null);
   };
+
+  const canMovePrev = viewerIndex != null && viewerIndex > 0;
+  const canMoveNext = viewerIndex != null && viewerIndex < filtered.length - 1;
+
+  const moveViewer = (direction: -1 | 1) => {
+    if (viewerIndex == null) return;
+    const nextIndex = viewerIndex + direction;
+    if (nextIndex < 0 || nextIndex >= filtered.length) return;
+    const nextArt = filtered[nextIndex];
+    setViewerIndex(nextIndex);
+    setViewerSrc(nextArt.private_image_path);
+    setViewerTitle(nextArt.title);
+    setViewerArt(nextArt);
+  };
+
+  const moveViewerEvent = useEffectEvent((direction: -1 | 1) => {
+    moveViewer(direction);
+  });
 
   // ✅ ESC 닫기
   useEffect(() => {
     if (!viewerOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeViewer();
+      if (e.key === "ArrowLeft") moveViewerEvent(-1);
+      if (e.key === "ArrowRight") moveViewerEvent(1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -574,6 +597,7 @@ export default function ManagePage() {
             const busy = busyId === a.id;
             const expired = isExpired(a);
             const extendEnabled = a.is_public && expired;
+            const absoluteIndex = filtered.findIndex((item) => item.id === a.id);
 
             const showPublic = a.is_public;
             const publicBtnStyle: React.CSSProperties = showPublic
@@ -586,8 +610,8 @@ export default function ManagePage() {
                   className="thumbWrap"
                   role="button"
                   tabIndex={0}
-                  onClick={() => openViewer(a)}
-                  onKeyDown={(e) => e.key === "Enter" && openViewer(a)}
+                  onClick={() => openViewer(a, absoluteIndex)}
+                  onKeyDown={(e) => e.key === "Enter" && openViewer(a, absoluteIndex)}
                   title="클릭하면 크게 보기"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -657,9 +681,17 @@ export default function ManagePage() {
                 <div className="modalEyebrow">{viewerArt?.kid_name ?? ""}</div>
                 <div className="modalTitle">{viewerTitle}</div>
               </div>
-              <button className="modalClose" onClick={closeViewer} aria-label="닫기">
-                닫기
-              </button>
+              <div className="modalActions">
+                <button className="navBtn" onClick={() => moveViewer(-1)} disabled={!canMovePrev} aria-label="이전 작품">
+                  이전
+                </button>
+                <button className="navBtn" onClick={() => moveViewer(1)} disabled={!canMoveNext} aria-label="다음 작품">
+                  다음
+                </button>
+                <button className="modalClose" onClick={closeViewer} aria-label="닫기">
+                  닫기
+                </button>
+              </div>
             </div>
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -756,6 +788,9 @@ export default function ManagePage() {
         .modalTitleWrap { min-width: 0; }
         .modalEyebrow { font-size: 11px; color: #6b7280; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
         .modalTitle { font-weight: 900; letter-spacing: -0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .modalActions { display: flex; align-items: center; gap: 8px; }
+        .navBtn { padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
+        .navBtn:disabled { opacity: 0.45; cursor: not-allowed; }
         .modalClose { padding: 8px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111827; font-size: 12px; font-weight: 900; cursor: pointer; }
         .modalImg { width: 100%; height: auto; max-height: calc(92vh - 190px); object-fit: contain; background: #111827; }
         .modalInfo { display: grid; gap: 8px; padding: 14px; border-top: 1px solid #eef0f3; background: #fff; }

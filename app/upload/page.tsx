@@ -421,7 +421,7 @@ export default function UploadPage() {
               </div>
             </div>
 
-            <div className="hint">여러 장을 한 번에 올릴 수 있습니다. 각 작품은 개별 항목으로 저장됩니다.</div>
+            <div className="hint">여러 장을 한 번에 올릴 수 있습니다. 각 작품은 개별 항목으로 저장됩니다. 사진을 꾹 누르시면 복수개가 선택됩니다.</div>
           </div>
         </div>
 
