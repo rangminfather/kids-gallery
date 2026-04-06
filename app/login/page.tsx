@@ -26,9 +26,7 @@ export default function LoginPage() {
   useEffect(() => {
     const run = async () => {
       const { data, error } = await supabase.auth.getSession();
-      if (!error && data.session) {
-        router.replace("/");
-      }
+      if (!error && data.session) router.replace("/");
     };
     void run();
   }, [router]);
@@ -50,10 +48,7 @@ export default function LoginPage() {
     setBusy(true);
     setMessage("로그인 중...");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setMessage("로그인 실패: 아이디와 비밀번호를 확인해 주세요.");
@@ -72,18 +67,12 @@ export default function LoginPage() {
   return (
     <main className="wrap">
       <section className="card">
-        <div className="badgeRow">
-          <div className="badge">FAMILY LOGIN</div>
-          <InstallPrompt className="installChip" compact />
-        </div>
-
+        <div className="badge">FAMILY LOGIN</div>
         <h1 className="title">가족 전시관 로그인</h1>
-        <p className="desc">
-          아이디로 로그인해 주세요. 설치 버튼을 누르면 홈 화면에서 앱처럼 바로 열 수 있습니다.
-        </p>
+        <p className="desc">처음 오셨다면 아래 설치 카드를 먼저 눌러 홈 화면에 추가해 두는 것을 권장합니다.</p>
 
         <div className="installArea">
-          <InstallPrompt className="installBtn" />
+          <InstallPrompt className="installPanel" tone="light" title="앱처럼 설치하고 바로 열기" />
         </div>
 
         <div className="form">
@@ -127,21 +116,13 @@ export default function LoginPage() {
         }
 
         .card {
-          width: min(460px, 100%);
+          width: min(560px, 100%);
           border-radius: 24px;
           border: 1px solid rgba(17, 24, 39, 0.08);
-          background: rgba(255, 255, 255, 0.92);
+          background: rgba(255, 255, 255, 0.94);
           box-shadow: 0 24px 60px rgba(17, 24, 39, 0.12);
           padding: 24px;
           backdrop-filter: blur(8px);
-        }
-
-        .badgeRow {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
         }
 
         .badge {
@@ -149,17 +130,6 @@ export default function LoginPage() {
           letter-spacing: 0.18em;
           color: #7c1320;
           font-weight: 900;
-        }
-
-        .installChip {
-          font-size: 12px;
-          border: 1px solid rgba(17, 24, 39, 0.1);
-          background: #fff;
-          color: #111827;
-          padding: 8px 10px;
-          border-radius: 10px;
-          cursor: pointer;
-          font-weight: 800;
         }
 
         .title {
@@ -177,20 +147,11 @@ export default function LoginPage() {
         }
 
         .installArea {
-          margin-top: 16px;
+          margin-top: 18px;
         }
 
-        .installBtn {
+        .installPanel {
           width: 100%;
-          border: 1px solid rgba(124, 19, 32, 0.18);
-          background: linear-gradient(180deg, #9b1c2c 0%, #7c1320 100%);
-          color: #fff;
-          padding: 12px 14px;
-          border-radius: 14px;
-          font-size: 14px;
-          font-weight: 900;
-          cursor: pointer;
-          box-shadow: 0 12px 28px rgba(124, 19, 32, 0.2);
         }
 
         .form {

@@ -103,7 +103,6 @@ export default function HomePage() {
             {actionLoading === "logout" ? "로그아웃 중..." : "로그아웃"}
           </button>
         )}
-        <InstallPrompt className="installChip" compact />
       </div>
 
       <section className="center">
@@ -112,7 +111,7 @@ export default function HomePage() {
           <h1 className="title">Family Art Museum</h1>
           <p className="sub">가족 전시관에서 올리고, 공개 갤러리에서 함께 전시해요.</p>
           <div className="installRow">
-            <InstallPrompt className="installBtn" />
+            <InstallPrompt className="installPanel" title="앱으로 설치하고 바로 열기" />
           </div>
         </div>
 
@@ -222,8 +221,7 @@ export default function HomePage() {
           letter-spacing: -0.2px;
         }
 
-        .linkBtn,
-        .installChip {
+        .linkBtn {
           font-size: 12px;
           border: 1px solid rgba(255,255,255,0.16);
           background: rgba(255,255,255,0.06);
@@ -273,21 +271,14 @@ export default function HomePage() {
         }
 
         .installRow {
-          margin-top: 14px;
+          margin-top: 18px;
           display: flex;
           justify-content: center;
+          width: 100%;
         }
 
-        .installBtn {
-          border: 1px solid rgba(255,255,255,0.18);
-          background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
-          color: #fff;
-          padding: 12px 16px;
-          border-radius: 14px;
-          font-size: 14px;
-          font-weight: 900;
-          cursor: pointer;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+        .installPanel {
+          width: min(720px, 100%);
         }
 
         .cardRow {
