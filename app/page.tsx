@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
+import InstallPrompt from "./components/InstallPrompt";
 
 export default function HomePage() {
   const router = useRouter();
@@ -11,37 +12,25 @@ export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [actionLoading, setActionLoading] = useState<"logout" | null>(null);
 
-  // ✅ 버전 표식 (환경변수 있으면 표시)
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION;
-
-  // ✅ "공개 갤러리"가 회원 전용이면 true로 바꾸세요.
-  // 지금 대화 맥락상 회원 전용이 맞으니 true로 둡니다.
   const GALLERY_REQUIRES_LOGIN = true;
 
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
-      // 최초 세션 확인
       const { data } = await supabase.auth.getSession();
       if (!mounted) return;
-
-      const loggedIn = !!data.session;
-      setIsLoggedIn(loggedIn);
+      setIsLoggedIn(!!data.session);
       setSessionLoading(false);
     };
 
-    init();
+    void init();
 
-    // ✅ 세션 변화(로그인/로그아웃/토큰갱신) 감지
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const loggedIn = !!session;
       setIsLoggedIn(loggedIn);
-
-      // ✅ 안전장치: 로그아웃 발생 시 /login으로 보내기
-      if (!loggedIn) {
-        router.replace("/login");
-      }
+      if (!loggedIn) router.replace("/login");
     });
 
     return () => {
@@ -56,7 +45,6 @@ export default function HomePage() {
   };
 
   const goGallery = () => {
-    // ✅ 공개갤러리가 회원 전용이라면 여기서 차단
     if (GALLERY_REQUIRES_LOGIN && !isLoggedIn) {
       router.push("/login");
       return;
@@ -94,36 +82,28 @@ export default function HomePage() {
   return (
     <main className="wrap">
       <div className="hall" />
-
       <div className="curtain left" />
       <div className="curtain right" />
 
       <div className="topbar">
         <div className="chip">{statusText}</div>
-
-        {/* ✅ 버전 표식 */}
         {!!appVersion && <div className="ver">v{appVersion}</div>}
-
-        {/* ✅ 로그인 상태일 때만 비밀번호 변경 버튼 노출 */}
         {!sessionLoading && isLoggedIn && (
           <button className="linkBtn" onClick={goPassword}>
             비밀번호 변경
           </button>
         )}
-
-        {/* ✅ 비로그인일 때 로그인 버튼 노출 */}
         {!sessionLoading && !isLoggedIn && (
           <button className="linkBtn" onClick={goLogin}>
             로그인
           </button>
         )}
-
-        {/* ✅ 로그인일 때 로그아웃 버튼 */}
         {!sessionLoading && isLoggedIn && (
           <button className="linkBtn" onClick={logout} disabled={actionLoading === "logout"}>
             {actionLoading === "logout" ? "로그아웃 중..." : "로그아웃"}
           </button>
         )}
+        <InstallPrompt className="installChip" compact />
       </div>
 
       <section className="center">
@@ -131,6 +111,9 @@ export default function HomePage() {
           <div className="kicker">아이들 작품 사이버 전시</div>
           <h1 className="title">Family Art Museum</h1>
           <p className="sub">가족 전시관에서 올리고, 공개 갤러리에서 함께 전시해요.</p>
+          <div className="installRow">
+            <InstallPrompt className="installBtn" />
+          </div>
         </div>
 
         <div className="cardRow">
@@ -138,7 +121,7 @@ export default function HomePage() {
             <div className="icon">🏠</div>
             <div className="cardTitle">가족 전시관</div>
             <div className="cardDesc">
-              우리 가족 작품 관리 / 전시 공개 설정
+              우리 가족 작품 관리와 전시 공개를 설정해요.
               {!sessionLoading && !isLoggedIn && <span className="hint"> · 로그인 필요</span>}
             </div>
           </button>
@@ -147,10 +130,8 @@ export default function HomePage() {
             <div className="icon">🖼️</div>
             <div className="cardTitle">공개 갤러리</div>
             <div className="cardDesc">
-              전시 중인 작품 구경하기
-              {!sessionLoading && GALLERY_REQUIRES_LOGIN && !isLoggedIn && (
-                <span className="hint"> · 로그인 필요</span>
-              )}
+              전시 중인 작품을 둘러봐요.
+              {!sessionLoading && GALLERY_REQUIRES_LOGIN && !isLoggedIn && <span className="hint"> · 로그인 필요</span>}
             </div>
           </button>
         </div>
@@ -219,6 +200,7 @@ export default function HomePage() {
           align-items: center;
           gap: 10px;
           padding: 16px 18px;
+          flex-wrap: wrap;
         }
 
         .chip {
@@ -230,7 +212,6 @@ export default function HomePage() {
           backdrop-filter: blur(6px);
         }
 
-        /* ✅ 버전 표식: 과하지 않게 */
         .ver {
           font-size: 11px;
           padding: 6px 10px;
@@ -241,7 +222,8 @@ export default function HomePage() {
           letter-spacing: -0.2px;
         }
 
-        .linkBtn {
+        .linkBtn,
+        .installChip {
           font-size: 12px;
           border: 1px solid rgba(255,255,255,0.16);
           background: rgba(255,255,255,0.06);
@@ -249,6 +231,7 @@ export default function HomePage() {
           padding: 6px 10px;
           border-radius: 10px;
           cursor: pointer;
+          backdrop-filter: blur(6px);
         }
 
         .linkBtn:disabled {
@@ -287,6 +270,24 @@ export default function HomePage() {
           margin: 0;
           opacity: 0.75;
           font-size: 14px;
+        }
+
+        .installRow {
+          margin-top: 14px;
+          display: flex;
+          justify-content: center;
+        }
+
+        .installBtn {
+          border: 1px solid rgba(255,255,255,0.18);
+          background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
+          color: #fff;
+          padding: 12px 16px;
+          border-radius: 14px;
+          font-size: 14px;
+          font-weight: 900;
+          cursor: pointer;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.18);
         }
 
         .cardRow {
