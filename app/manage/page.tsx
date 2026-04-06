@@ -219,13 +219,13 @@ export default function ManagePage() {
   };
 
   const canMovePrev = viewerIndex != null && viewerIndex > 0;
-  const canMoveNext = viewerIndex != null && viewerIndex < filtered.length - 1;
+  const canMoveNext = viewerIndex != null && viewerIndex < items.length - 1;
 
   const moveViewer = (direction: -1 | 1) => {
     if (viewerIndex == null) return;
     const nextIndex = viewerIndex + direction;
-    if (nextIndex < 0 || nextIndex >= filtered.length) return;
-    const nextArt = filtered[nextIndex];
+    if (nextIndex < 0 || nextIndex >= items.length) return;
+    const nextArt = items[nextIndex];
     setViewerIndex(nextIndex);
     setViewerSrc(nextArt.private_image_path);
     setViewerTitle(nextArt.title);
@@ -597,7 +597,7 @@ export default function ManagePage() {
             const busy = busyId === a.id;
             const expired = isExpired(a);
             const extendEnabled = a.is_public && expired;
-            const absoluteIndex = filtered.findIndex((item) => item.id === a.id);
+            const absoluteIndex = items.findIndex((item) => item.id === a.id);
 
             const showPublic = a.is_public;
             const publicBtnStyle: React.CSSProperties = showPublic
