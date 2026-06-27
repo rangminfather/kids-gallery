@@ -12,6 +12,10 @@ type SelectedUploadFile = {
   previewUrl: string;
   detectedMadeAt: string | null;
   titleSuggestion: string;
+  title: string;
+  titleEdited: boolean;
+  kidName: string;
+  kidNameEdited: boolean;
 };
 
 function pad2(v: number) {
@@ -26,6 +30,13 @@ function formatDateForInput(date: Date) {
 
 function sanitizeTitleFromFilename(name: string) {
   return name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "작품";
+}
+
+function defaultTitleFor(suggestion: string, index: number, count: number, template: string) {
+  const t = template.trim();
+  if (count <= 1) return t;
+  if (t) return `${t} ${index + 1}`;
+  return suggestion;
 }
 
 function exifToInputValue(raw: string) {
@@ -200,13 +211,26 @@ export default function UploadPage() {
     };
   }, [selectedFiles]);
 
+  // 상단 공통 "제목" 변경 시, 사용자가 직접 고치지 않은 카드만 갱신
+  useEffect(() => {
+    setSelectedFiles((prev) =>
+      prev.map((item, index) =>
+        item.titleEdited ? item : { ...item, title: defaultTitleFor(item.titleSuggestion, index, prev.length, title) }
+      )
+    );
+  }, [title]);
+
+  // 상단 공통 "아이 이름(작가)" 변경 시, 직접 고치지 않은 카드만 갱신
+  useEffect(() => {
+    setSelectedFiles((prev) => prev.map((item) => (item.kidNameEdited ? item : { ...item, kidName: kidName.trim() })));
+  }, [kidName]);
+
   const canSubmit = useMemo(() => {
-    if (!kidName.trim()) return false;
     if (selectedFiles.length === 0) return false;
-    if (selectedFiles.length === 1 && !title.trim()) return false;
+    if (selectedFiles.some((item) => !item.title.trim() || !item.kidName.trim())) return false;
     if (madeAtMode === "manual" && !!madeAtError) return false;
     return true;
-  }, [kidName, selectedFiles, title, madeAtMode, madeAtError]);
+  }, [selectedFiles, madeAtMode, madeAtError]);
 
   const handleFilesChange = async (list: FileList | null) => {
     const files = Array.from(list ?? []);
@@ -221,14 +245,25 @@ export default function UploadPage() {
     setMsgTone("info");
     setMsg("사진 정보를 읽는 중...");
 
-    const next = await Promise.all(
-      files.map(async (file) => ({
-        file,
-        previewUrl: URL.createObjectURL(file),
-        detectedMadeAt: await detectPhotoMadeAt(file),
-        titleSuggestion: sanitizeTitleFromFilename(file.name),
-      }))
+    const built = await Promise.all(
+      files.map(async (file) => {
+        const titleSuggestion = sanitizeTitleFromFilename(file.name);
+        return {
+          file,
+          previewUrl: URL.createObjectURL(file),
+          detectedMadeAt: await detectPhotoMadeAt(file),
+          titleSuggestion,
+        };
+      })
     );
+
+    const next: SelectedUploadFile[] = built.map((item, index) => ({
+      ...item,
+      title: defaultTitleFor(item.titleSuggestion, index, built.length, title),
+      titleEdited: false,
+      kidName: kidName.trim(),
+      kidNameEdited: false,
+    }));
 
     setSelectedFiles(next);
     setMsg("");
@@ -247,10 +282,12 @@ export default function UploadPage() {
     return parsed.iso;
   };
 
-  const buildTitle = (item: SelectedUploadFile, index: number) => {
-    if (selectedFiles.length === 1) return title.trim();
-    if (title.trim()) return `${title.trim()} ${index + 1}`;
-    return item.titleSuggestion;
+  const updateCardTitle = (index: number, value: string) => {
+    setSelectedFiles((prev) => prev.map((item, i) => (i === index ? { ...item, title: value, titleEdited: true } : item)));
+  };
+
+  const updateCardKidName = (index: number, value: string) => {
+    setSelectedFiles((prev) => prev.map((item, i) => (i === index ? { ...item, kidName: value, kidNameEdited: true } : item)));
   };
 
   const resetForm = () => {
@@ -264,7 +301,7 @@ export default function UploadPage() {
 
   const upload = async () => {
     if (!canSubmit) {
-      alert("아이 이름과 사진 파일을 확인하고, 단일 업로드일 때는 제목도 입력해 주세요.");
+      alert("사진을 선택하고, 각 작품 카드의 제목과 작가(아이 이름)를 모두 입력해 주세요.");
       return;
     }
 
@@ -296,8 +333,8 @@ export default function UploadPage() {
 
         const { error: dbError } = await supabase.from("artworks").insert({
           family_id: prof.family_id,
-          kid_name: kidName.trim(),
-          title: buildTitle(item, i),
+          kid_name: item.kidName.trim(),
+          title: item.title.trim(),
           private_image_path: publicUrl,
           public_image_path: publicUrl,
           is_public: false,
@@ -342,23 +379,24 @@ export default function UploadPage() {
       <section className="card">
         <div className="grid">
           <div className="field">
-            <label className="label">아이 이름</label>
+            <label className="label">아이 이름(작가) · 공통 기본값</label>
             <input className="input" placeholder="예: 민서" value={kidName} onChange={(e) => setKidName(e.target.value)} disabled={busy} />
+            <div className="hint">아래 사진 카드에 자동으로 채워집니다. 작품마다 작가가 다르면 카드에서 직접 고치세요.</div>
           </div>
 
           <div className="field">
-            <label className="label">{selectedFiles.length > 1 ? "제목 템플릿" : "작품 제목"}</label>
+            <label className="label">제목 · 공통 기본값</label>
             <input
               className="input"
-              placeholder={selectedFiles.length > 1 ? "비워두면 파일명으로 자동 저장" : "예: 봄 꽃밭"}
+              placeholder={selectedFiles.length > 1 ? "비워두면 파일명으로 자동 채움" : "예: 봄 꽃밭"}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={busy}
             />
             <div className="hint">
               {selectedFiles.length > 1
-                ? "여러 장 업로드 시 제목을 비워두면 각 파일명으로 저장하고, 입력하면 1, 2, 3 순번이 붙습니다."
-                : "단일 업로드일 때는 제목을 직접 입력합니다."}
+                ? "여러 장일 때 비워두면 각 파일명으로, 입력하면 1, 2, 3 순번이 붙어 카드에 채워집니다. 카드에서 개별 수정할 수 있습니다."
+                : "사진 카드에 자동으로 채워지며, 카드에서 직접 수정할 수 있습니다."}
             </div>
           </div>
 
@@ -437,7 +475,20 @@ export default function UploadPage() {
                 <div className="previewCard" key={`${item.file.name}-${index}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img className="preview" src={item.previewUrl} alt={item.file.name} />
-                  <div className="previewName">{buildTitle(item, index)}</div>
+                  <input
+                    className="cardInput"
+                    placeholder="제목"
+                    value={item.title}
+                    onChange={(e) => updateCardTitle(index, e.target.value)}
+                    disabled={busy}
+                  />
+                  <input
+                    className="cardInput"
+                    placeholder="작가(아이 이름)"
+                    value={item.kidName}
+                    onChange={(e) => updateCardKidName(index, e.target.value)}
+                    disabled={busy}
+                  />
                   <div className="previewHint">{item.detectedMadeAt ?? "-"}</div>
                 </div>
               ))}
@@ -493,7 +544,9 @@ export default function UploadPage() {
         .previewCard { border: 1px solid #e8ebf0; border-radius: 14px; background: #fff; padding: 8px; }
         .preview { width: 100%; height: 140px; object-fit: cover; border-radius: 10px; background: #f3f4f6; border: 1px solid #f1f5f9; }
         .previewName { margin-top: 8px; font-size: 12px; font-weight: 800; color: #111827; word-break: break-word; }
-        .previewHint { margin-top: 4px; font-size: 11px; color: #6b7280; }
+        .cardInput { margin-top: 8px; width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; outline: none; font-size: 12px; font-weight: 700; color: #111827; }
+        .cardInput:focus { border-color: #c7cdd6; }
+        .previewHint { margin-top: 6px; font-size: 11px; color: #6b7280; }
         .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .primary { padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); background: #111827; color: #fff; font-size: 13px; font-weight: 900; cursor: pointer; }
         .ghostBtn { padding: 11px 14px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; color: #111827; text-decoration: none; font-size: 13px; font-weight: 900; }
