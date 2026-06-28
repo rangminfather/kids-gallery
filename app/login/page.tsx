@@ -1,24 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import InstallPrompt from "../components/InstallPrompt";
 
-const FIXED_DOMAIN = "love.you";
-
-function usernameToEmail(username: string) {
-  const u = username.trim().toLowerCase();
-  if (!/^[a-z0-9._-]{3,30}$/.test(u)) {
-    throw new Error("아이디는 영문/숫자/._-만 가능하며 3~30자로 입력해 주세요.");
-  }
-  return `${u}@${FIXED_DOMAIN}`;
-}
-
 export default function LoginPage() {
   const router = useRouter();
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,29 +23,30 @@ export default function LoginPage() {
   }, [router]);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      setMessage("아이디와 비밀번호를 입력해 주세요.");
-      return;
-    }
+    const cleanEmail = email.trim().toLowerCase();
 
-    let email: string;
-    try {
-      email = usernameToEmail(username);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "아이디 형식이 올바르지 않습니다.");
+    if (!cleanEmail || !password) {
+      setMessage("이메일과 비밀번호를 입력해 주세요.");
       return;
     }
 
     setBusy(true);
     setMessage("로그인 중...");
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
 
     if (error) {
-      setMessage("로그인 실패: 아이디와 비밀번호를 확인해 주세요.");
+      const isUnconfirmed = /confirm|verified/i.test(error.message);
+      setMessage(
+        isUnconfirmed
+          ? "이메일 인증이 아직 완료되지 않았어요. 받은편지함의 인증 링크를 먼저 눌러 주세요."
+          : "로그인 실패: 이메일과 비밀번호를 확인해 주세요."
+      );
       setBusy(false);
       return;
     }
+
+    await supabase.rpc("ensure_my_profile");
 
     setMessage("로그인 성공! 이동 중...");
     router.replace("/");
@@ -77,12 +69,13 @@ export default function LoginPage() {
 
         <div className="form">
           <input
-            type="text"
-            placeholder="아이디"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            type="email"
+            placeholder="이메일"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             onKeyDown={onKeyDown}
-            autoComplete="username"
+            autoComplete="email"
+            inputMode="email"
             className="input"
           />
 
@@ -99,6 +92,12 @@ export default function LoginPage() {
           <button onClick={() => void handleLogin()} disabled={busy} className="submit">
             {busy ? "로그인 중..." : "로그인"}
           </button>
+
+          <div className="links">
+            <Link href="/signup" className="linkA">회원가입</Link>
+            <span className="dot">·</span>
+            <Link href="/forgot-password" className="linkA">비밀번호를 잊으셨나요?</Link>
+          </div>
         </div>
 
         {message && <p className="message">{message}</p>}
@@ -196,6 +195,25 @@ export default function LoginPage() {
           background: #fff;
           color: #111827;
         }
+
+        .links {
+          margin-top: 4px;
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+        }
+
+        .linkA {
+          color: #7c1320;
+          font-weight: 800;
+          text-decoration: none;
+        }
+
+        .linkA:hover { text-decoration: underline; }
+
+        .dot { color: #d1d5db; }
       `}</style>
     </main>
   );
